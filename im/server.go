@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"sync"
 )
@@ -15,11 +16,11 @@ type Sever struct {
 }
 
 func (sever *Sever) BroadCast(user *User, msg string) {
-	sendMsg := "[" + user.Addr + "]" + user.Name + ":" + msg
+	sendMsg := "[" + user.Name + "]" + ":" + msg
 	sever.Message <- sendMsg
 }
 
-func (server *Sever) Listener() {
+func (server *Sever) ListenMessage() {
 	for {
 		msg := <-server.Message
 		server.mapLock.Lock()
@@ -42,6 +43,25 @@ func (server *Sever) Handle(conn net.Conn) {
 
 	server.BroadCast(user, "online alert")
 
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			n, err := conn.Read(buf)
+			if n == 0 {
+				server.BroadCast(user, "outline")
+			}
+			if err != nil && err != io.EOF {
+				fmt.Println("Conn Read err", err)
+				return
+			}
+
+			msg := string(buf[:n])
+			fmt.Println("msg::", msg)
+
+			server.BroadCast(user, msg)
+		}
+	}()
+
 }
 
 func (server *Sever) Start() {
@@ -52,7 +72,7 @@ func (server *Sever) Start() {
 	}
 	defer listener.Close()
 
-	go server.Listener()
+	go server.ListenMessage()
 
 	for {
 		conn, err := listener.Accept()
