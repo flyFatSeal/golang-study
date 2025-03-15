@@ -36,7 +36,7 @@ func (server *Server) Handle(conn net.Conn) {
 
 	user := NewUser(conn, server)
 	server.mapLock.Lock()
-	server.OnlineUserMap[user.Name] = *user
+	server.OnlineUserMap[user.Addr] = *user
 	server.mapLock.Unlock()
 
 	fmt.Println("建立链接完成，请求来自", remoteAddr.String())
