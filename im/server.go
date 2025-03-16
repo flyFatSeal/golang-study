@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 )
 
 type Server struct {
@@ -41,6 +42,18 @@ func (server *Server) Handle(conn net.Conn) {
 
 	fmt.Println("建立链接完成，请求来自", remoteAddr.String())
 
+	// 添加 defer 确保资源清理
+	defer func() {
+		user.Offline()
+		server.mapLock.Lock()
+		delete(server.OnlineUserMap, user.Addr) // 从在线用户map中删除
+		server.mapLock.Unlock()
+		close(user.C)
+		conn.Close()
+	}()
+
+	isLive := make(chan bool)
+
 	user.Online()
 
 	go func() {
@@ -58,10 +71,20 @@ func (server *Server) Handle(conn net.Conn) {
 
 			msg := string(buf[:n-1])
 
-			user.HandleMessage(msg)
+			isLive <- true
 
+			user.HandleMessage(msg)
 		}
 	}()
+
+	for {
+		select {
+		case <-isLive:
+		case <-time.After(time.Second * 10):
+			user.SendMsg("超时踢出")
+			return
+		}
+	}
 
 }
 
