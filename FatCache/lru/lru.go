@@ -1,6 +1,9 @@
 package lru
 
-import "container/list"
+import (
+	"container/list"
+	"fmt"
+)
 
 type Cache struct {
 	maxBytes int64
@@ -58,6 +61,12 @@ func (c *Cache) RemoveOldest() {
 }
 
 func (c *Cache) Add(key string, value Value) {
+
+	if int64(len(key))+int64(value.Len()) > c.maxBytes {
+		fmt.Printf("Value for key %s is too large to cache\n", key)
+		return // 超大值直接返回，不缓存
+	}
+
 	if ele, ok := c.cache[key]; ok {
 		c.ll.MoveToFront(ele)
 		kv := ele.Value.(*entry)

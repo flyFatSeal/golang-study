@@ -101,6 +101,9 @@ func TestConcurrentAccess(t *testing.T) {
 
 func TestExtremeCases(t *testing.T) {
 	getter := GetterFunc(func(key string) ([]byte, error) {
+		if key == "" {
+			return nil, fmt.Errorf("key cannot be empty")
+		}
 		return []byte("Value for " + key), nil
 	})
 
