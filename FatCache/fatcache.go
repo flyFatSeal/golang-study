@@ -27,6 +27,10 @@ type Group struct {
 	getter    Getter
 }
 
+func GetGroup(name string) *Group {
+	return groups[name]
+}
+
 func NewGroup(name string, cacheBytes int64, getter Getter) *Group {
 	mu.Lock()
 	defer mu.Unlock()
