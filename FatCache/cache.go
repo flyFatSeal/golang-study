@@ -26,6 +26,8 @@ func (c *Cache) add(key string, value ByteView) {
 }
 
 func (c *Cache) get(key string) (ByteView, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.lru == nil {
 		return ByteView{}, false
 	}
