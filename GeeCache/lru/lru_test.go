@@ -43,12 +43,12 @@ func TestOnEvicted(t *testing.T) {
 		keys = append(keys, key)
 	}
 	lru := New(int64(10), callback)
-	lru.Add("key1", String("123456"))
+	lru.Add("k1", String("k1"))
 	lru.Add("k2", String("k2"))
 	lru.Add("k3", String("k3"))
 	lru.Add("k4", String("k4"))
 
-	expect := []string{"key1", "k2"}
+	expect := []string{"k1", "k2"}
 
 	if !reflect.DeepEqual(expect, keys) {
 		t.Fatalf("Call OnEvicted failed, expect keys equals to %s", expect)
