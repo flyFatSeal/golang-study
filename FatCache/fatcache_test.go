@@ -2,6 +2,10 @@ package fatcache
 
 import (
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -104,6 +108,9 @@ func TestExtremeCases(t *testing.T) {
 		if key == "" {
 			return nil, fmt.Errorf("key cannot be empty")
 		}
+		if key == "nonexistentKey" {
+			return nil, fmt.Errorf("key not existing")
+		}
 		return []byte("Value for " + key), nil
 	})
 
@@ -124,5 +131,80 @@ func TestExtremeCases(t *testing.T) {
 	_, err = group.Get("largeKey")
 	if err == nil {
 		t.Fatalf("Expected error for large value exceeding cache capacity")
+	}
+}
+
+func TestHTTPServer(t *testing.T) {
+	// 创建一个 GetterFunc
+	getter := GetterFunc(func(key string) ([]byte, error) {
+		if key == "" {
+			return nil, fmt.Errorf("key cannot be empty")
+		}
+		if key == "nonexistentKey" {
+			return nil, fmt.Errorf("key not existing")
+		}
+		return []byte("Value for " + key), nil
+	})
+
+	// 创建一个缓存组
+	group := NewGroup("testGroup", 1024, getter)
+
+	// 创建 HTTP 服务器并挂载到缓存组
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		key := strings.TrimPrefix(r.URL.Path, "/")
+		if key == "" {
+			http.Error(w, "key is required", http.StatusBadRequest)
+			return
+		}
+		value, err := group.Get(key)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Write(value.ByteSlice())
+	}))
+	defer server.Close()
+
+	// 测试有效的 key
+	resp, err := http.Get(server.URL + "/myKey")
+	if err != nil {
+		t.Fatalf("Failed to send GET request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read response body: %v", err)
+	}
+
+	expected := "Value for myKey"
+	if string(body) != expected {
+		t.Fatalf("Unexpected response body, got %s, expected %s", string(body), expected)
+	}
+
+	// 测试空 key
+	resp, err = http.Get(server.URL + "/")
+	if err != nil {
+		t.Fatalf("Failed to send GET request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("Expected status 400 for empty key, got %d", resp.StatusCode)
+	}
+
+	// 测试不存在的 key
+	resp, err = http.Get(server.URL + "/nonexistentKey")
+	if err != nil {
+		t.Fatalf("Failed to send GET request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("Expected status 400 for nonexistent key, got %d", resp.StatusCode)
 	}
 }
